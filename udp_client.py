@@ -11,7 +11,36 @@ window_start = 0
 buffered_packets = {}
 
 
-def make_POST_packets(router_addr, router_port, server_addr, server_port, method):
+def handle_get_directory(router_addr, router_port, server_addr, server_port, route):
+    peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
+    conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    timeout = 1
+
+    msg = 'get,' + route
+    payload = msg.encode("utf-8")
+
+    p = Packet(packet_type=0,
+               seq_num=1,
+               peer_ip_addr=peer_ip,
+               peer_port=server_port,
+               payload=payload)
+    try:
+        print('sending...')
+        conn.sendto(p.to_bytes(), (router_addr, router_port))
+        conn.settimeout(timeout)
+        response, sender = conn.recvfrom(1024)
+
+        p = Packet.from_bytes(response)
+        print(p.seq_num)
+        print(p.payload.decode("utf-8"))
+
+    except socket.timeout:
+        print('No response after {}s'.format(timeout))
+        handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+    finally:
+        conn.close()
+
+def make_POST_packets(router_addr, router_port, server_addr, server_port, method, route):
     peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     timeout = 5
@@ -20,7 +49,7 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
 
     try:
         body = "Hello World"
-        body = "Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld"
+        body = "1Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
 
         payload = body.encode("utf-8")
 
@@ -37,16 +66,22 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
             seq_num += 1
             packets.append(p)
 
-        print(len(packets))
         window_size = math.floor(len(packets) / 2)
         global window_start
         thread_list = []
 
         while window_start < len(packets):
             for i in range(window_size):
-                thread = threading.Thread(target=send_packet, args=(router_addr, router_port, packets[i+window_start],))
-                thread_list.append(thread)
-                # thread.start()
+                # print('i: ' + str(i))
+                # print('window start: ' + str(window_start))
+                if packets[i + window_start].seq_num not in buffered_packets:
+                    print('Sending Packet: ' + str(i + window_start + 1))
+                    try:
+                        thread = threading.Thread(target=send_packet,
+                                                  args=(router_addr, router_port, packets[i + window_start],))
+                        thread_list.append(thread)
+                    except:
+                        pass
 
             for t in thread_list:
                 try:
@@ -55,17 +90,11 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
                     pass
             for t in thread_list:
                 t.join()
-            # t1 = threading.Thread(target=send_packet, args=(router_addr, router_port, packets[0],))
-            # t2 = threading.Thread(target=send_packet, args=(router_addr, router_port, packets[1],))
-            # t1.start()
-            # t2.start()
-            # t1.join()
-            # t2.join()
+        print("DONE!")
+        p.packet_type = 1
+        p.payload = route.encode("utf-8")
+        conn.sendto(p.to_bytes(), (router_addr, router_port))
 
-            # for t in thread_list:
-            #     t.join()
-            # send_packet(router_addr, router_port, packets[window_start])
-   
     except socket.timeout:
         print('No response after {}s'.format(timeout))
     finally:
@@ -94,17 +123,20 @@ def send_packet(router_addr, router_port, packet):
 
         global window_start
 
-        if p.packet_type == 1:
-            print('Received ack!')
-            if p.seq_num not in buffered_packets:
-                buffered_packets[p.seq_num] = p
-                print('Buffering packet')
-            if p.seq_num == window_start + 1:
-                print('INCREASING WINDOW START')
-                window_start += 1
-                while window_start + 1 in buffered_packets:
-                    print("Buffered packet already inside move window")
+        try:
+            if p.packet_type == 1:
+                print('Received ack!')
+                if p.seq_num not in buffered_packets:
+                    buffered_packets[p.seq_num] = p
+                    print('Buffering packet')
+                if p.seq_num == window_start + 1:
+                    print('INCREASING WINDOW START')
                     window_start += 1
+                    while window_start + 1 in buffered_packets:
+                        print("Buffered packet already inside move window")
+                        window_start += 1
+        except:
+            print('Reached end of buffer')
         print('--------')
 
     except socket.timeout:
@@ -155,9 +187,14 @@ parser.add_argument("--serverhost", help="server host", default="localhost")
 parser.add_argument("--serverport", help="server port", type=int, default=8007)
 
 parser.add_argument("--method", help="http method", default="post")
+parser.add_argument("--route", help="http route", default="/files/")
 parser.add_argument("--body", help="http method", default="Hello World")
 
 args = parser.parse_args()
 
 # run_client(args.routerhost, args.routerport, args.serverhost, args.serverport)
-make_POST_packets(args.routerhost, args.routerport, args.serverhost, args.serverport, args.method)
+
+if args.method == 'post':
+    make_POST_packets(args.routerhost, args.routerport, args.serverhost, args.serverport, args.method, args.route)
+if args.method == 'get' and '.txt' not in args.route:
+    handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
