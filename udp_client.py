@@ -6,6 +6,7 @@ import threading
 
 from packet import Packet
 
+ACK = 1
 window_size = 0
 window_start = 0
 buffered_packets = {}
@@ -25,13 +26,12 @@ def handle_get_directory(router_addr, router_port, server_addr, server_port, rou
                peer_port=server_port,
                payload=payload)
     try:
-        print('sending...')
+        print('Requesting all files within directory')
         conn.sendto(p.to_bytes(), (router_addr, router_port))
         conn.settimeout(timeout)
         response, sender = conn.recvfrom(1024)
 
         p = Packet.from_bytes(response)
-        print(p.seq_num)
         print(p.payload.decode("utf-8"))
 
     except socket.timeout:
@@ -58,7 +58,7 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         print('Sending request for file')
 
         buffered_file = {}
-        timeout = 4
+        timeout = 1
 
         conn.sendto(p.to_bytes(), (router_addr, router_port))
         conn.settimeout(timeout)
@@ -67,7 +67,10 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         response, sender = conn.recvfrom(1024)
         p = Packet.from_bytes(response)
 
-        while p.packet_type != 1:  # 1 is ACK
+        if p.packet_type == ACK:
+            buffered_file[p.seq_num] = p
+
+        while p.packet_type != ACK:  # 1 is ACK
             print(p)
             # p.seq_num += 1
             conn.sendto(p.to_bytes(), sender)
@@ -84,12 +87,16 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         for seq_num, packet in sorted(buffered_file.items()):
             msg += packet.payload.decode('utf-8')
         print(msg)
+
     except socket.timeout:
         print('No response after {}s'.format(timeout))
-        # handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+        handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
     finally:
         conn.close()
 
+
+def request_packet():
+    pass
 
 def make_POST_packets(router_addr, router_port, server_addr, server_port, method, route):
     peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
@@ -100,7 +107,7 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
 
     try:
         body = "Hello World"
-        body = "1Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
+        body = "0Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
 
         payload = body.encode("utf-8")
         seq_num = 1

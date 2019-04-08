@@ -10,6 +10,7 @@ ACK = 1
 SYN = 2
 SYN_ACK = 3
 buffered_post_packets = {}
+buffered_file_packets = {}
 
 
 def run_server(port):
@@ -18,8 +19,7 @@ def run_server(port):
         conn.bind(('', port))
         print('Echo server is listening at', port)
         while True:
-            global buffered_packets
-            # buffered_packets = {}
+            global buffered_file_packets
 
             data, sender = conn.recvfrom(1024)
 
@@ -75,13 +75,14 @@ def handle_get_file(conn, packet, sender, filepath):
 
         seq_num += 1
         packets.append(p)
-
+    print(packets)
     window_size = math.floor(len(packets) / 2)
     window_start = 0
     thread_list = []
 
     if window_size == 0:
-        conn.sendto(packets[0].to_bytes(), sender)
+        # conn.sendto(packets[0].to_bytes(), sender)
+        send_final_ack(conn, packets[0], sender)
 
     else:
         while window_start < len(packets):
@@ -93,6 +94,13 @@ def handle_get_file(conn, packet, sender, filepath):
                     window_start += 1
                     print(window_start)
     # conn.sendto(packet.to_bytes(), sender)
+
+
+def send_final_ack(conn, packet, sender):
+    timeout = 2
+    packet.packet_type = ACK
+    conn.sendto(packet.to_bytes(), sender)
+    print('SENT FINAL PACKET OUT...')
 
 
 def send_file_packet(conn, packet, sender):
