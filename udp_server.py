@@ -11,6 +11,8 @@ SYN = 2
 SYN_ACK = 3
 buffered_post_packets = {}
 buffered_file_packets = {}
+window_start = 0
+window_size = 0
 
 
 def run_server(port):
@@ -54,6 +56,8 @@ def handle_get_directories(conn, packet, sender):
 def handle_get_file(conn, packet, sender, filepath):
     f = open('./' + filepath, 'r')
     # print(f.read())
+    global window_start
+    global window_size
 
     msg = str(f.read())
     payload = msg.encode("utf-8")
@@ -81,8 +85,7 @@ def handle_get_file(conn, packet, sender, filepath):
     thread_list = []
 
     if window_size == 0:
-        # conn.sendto(packets[0].to_bytes(), sender)
-        send_final_ack(conn, packets[0], sender)
+        send_single_final_pkt(conn, packets[0], sender)
 
     else:
         while window_start < len(packets):
@@ -96,8 +99,7 @@ def handle_get_file(conn, packet, sender, filepath):
     # conn.sendto(packet.to_bytes(), sender)
 
 
-def send_final_ack(conn, packet, sender):
-    timeout = 2
+def send_single_final_pkt(conn, packet, sender):
     packet.packet_type = ACK
     conn.sendto(packet.to_bytes(), sender)
     print('SENT FINAL PACKET OUT...')
