@@ -1,4 +1,5 @@
 import argparse
+import math
 import socket
 import os
 
@@ -8,7 +9,7 @@ DATA = 0
 ACK = 1
 SYN = 2
 SYN_ACK = 3
-buffered_packets = {}
+buffered_post_packets = {}
 
 
 def run_server(port):
@@ -17,6 +18,9 @@ def run_server(port):
         conn.bind(('', port))
         print('Echo server is listening at', port)
         while True:
+            global buffered_packets
+            # buffered_packets = {}
+
             data, sender = conn.recvfrom(1024)
 
             p = Packet.from_bytes(data)
@@ -33,6 +37,8 @@ def run_server(port):
                         files += file + '\n'
                     p.payload = files.encode("utf-8")
                     handle_get_directories(conn, p, sender)
+                else:
+                    handle_get_file(conn, p, sender, filepath)
             else:
                 handle_client(conn, data, sender)
 
@@ -45,14 +51,76 @@ def handle_get_directories(conn, packet, sender):
     conn.sendto(packet.to_bytes(), sender)
 
 
+def handle_get_file(conn, packet, sender, filepath):
+    f = open('./' + filepath, 'r')
+    # print(f.read())
+
+    msg = str(f.read())
+    payload = msg.encode("utf-8")
+    print(msg)
+    seq_num = 1
+    packets = []
+
+    while len(msg) > 1012 or len(msg) > 0:
+        msg = payload[0:1012]
+        payload = payload[1012:]
+        if len(msg) == 0:
+            break
+
+        p = Packet(packet_type=0,
+                   seq_num=seq_num,
+                   peer_ip_addr=packet.peer_ip_addr,
+                   peer_port=packet.peer_port,
+                   payload=msg)
+
+        seq_num += 1
+        packets.append(p)
+
+    window_size = math.floor(len(packets) / 2)
+    window_start = 0
+    thread_list = []
+
+    if window_size == 0:
+        conn.sendto(packets[0].to_bytes(), sender)
+
+    else:
+        while window_start < len(packets):
+            for i in range(window_size):
+                print('Sending packet ' + str(i+window_size))
+                p = send_file_packet(conn, packets[i+window_size], sender)
+                print(p)
+                if p == window_start:
+                    window_start += 1
+                    print(window_start)
+    # conn.sendto(packet.to_bytes(), sender)
+
+
+def send_file_packet(conn, packet, sender):
+    global buffered_packets
+    timeout = 4
+
+    try:
+        conn.sendto(packet.to_bytes(), sender)
+        conn.settimeout(timeout)
+        print('Waiting for a response')
+
+        response, sender = conn.recvfrom(1024)
+        return Packet.from_bytes(response)
+
+    except socket.timeout:
+        print('No packet received')
+        pass
+
+
 def handle_client(conn, data, sender):
     try:
         p = Packet.from_bytes(data)
+        global buffered_post_packets
 
         # Last packet has been sent so client has sent ACK
         if p.packet_type == ACK:
             msg = ''
-            for seq_num, packet in sorted(buffered_packets.items()):
+            for seq_num, packet in sorted(buffered_post_packets.items()):
                 msg += packet.payload.decode("utf-8")
 
             filepath = p.payload.decode("utf-8")
@@ -66,7 +134,8 @@ def handle_client(conn, data, sender):
             print("Router: ", sender)
             print("Packet: ", p)
             print("Payload: ", p.payload.decode("utf-8"))
-            buffered_packets.update({p.seq_num: p})
+            buffered_post_packets[p.seq_num] = p
+
 
         # How to send a reply.
         # The peer address of the packet p is the address of the client already.

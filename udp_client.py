@@ -6,7 +6,7 @@ import threading
 
 from packet import Packet
 
-window = []
+window_size = 0
 window_start = 0
 buffered_packets = {}
 
@@ -40,10 +40,61 @@ def handle_get_directory(router_addr, router_port, server_addr, server_port, rou
     finally:
         conn.close()
 
+
+def handle_get_file(router_addr, router_port, server_addr, server_port, route):
+    peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
+    conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    timeout = 1
+
+    msg = 'get,' + route
+    payload = msg.encode("utf-8")
+
+    p = Packet(packet_type=0,
+               seq_num=1,
+               peer_ip_addr=peer_ip,
+               peer_port=server_port,
+               payload=payload)
+    try:
+        print('Sending request for file')
+
+        buffered_file = {}
+        timeout = 4
+
+        conn.sendto(p.to_bytes(), (router_addr, router_port))
+        conn.settimeout(timeout)
+
+        #  RESPONSE FROM SERVER
+        response, sender = conn.recvfrom(1024)
+        p = Packet.from_bytes(response)
+
+        while p.packet_type != 1:  # 1 is ACK
+            print(p)
+            # p.seq_num += 1
+            conn.sendto(p.to_bytes(), sender)
+            conn.settimeout(timeout)
+
+            buffered_file[p.seq_num] = p
+
+            response, sender = conn.recvfrom(1024)
+            p = Packet.from_bytes(response)
+            # print(p.payload.decode("utf-8"))
+        print('RETRIEVED ALL PACKETS FOR FILE WITHIN CLIENT')
+
+        msg = ''
+        for seq_num, packet in sorted(buffered_file.items()):
+            msg += packet.payload.decode('utf-8')
+        print(msg)
+    except socket.timeout:
+        print('No response after {}s'.format(timeout))
+        # handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+    finally:
+        conn.close()
+
+
 def make_POST_packets(router_addr, router_port, server_addr, server_port, method, route):
     peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    timeout = 5
+    timeout = 1
 
     packets = []
 
@@ -52,8 +103,8 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
         body = "1Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
 
         payload = body.encode("utf-8")
-
         seq_num = 1
+
         while len(payload) > 1012 or len(payload) > 0:
             msg = payload[0:1012]
             payload = payload[1012:]
@@ -66,34 +117,32 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
             seq_num += 1
             packets.append(p)
 
-        window_size = math.floor(len(packets) / 2)
+        global buffered_packets
+        global window_size
         global window_start
+
+        window_size = math.floor(len(packets) / 2)
         thread_list = []
 
+        print(packets)
         while window_start < len(packets):
             for i in range(window_size):
                 # print('i: ' + str(i))
                 # print('window start: ' + str(window_start))
-                if packets[i + window_start].seq_num not in buffered_packets:
+                # print('Sending Packet: ' + str(i + window_start + 1))
+                if i + window_start < len(packets) and packets[i + window_start].seq_num not in buffered_packets:
                     print('Sending Packet: ' + str(i + window_start + 1))
-                    try:
-                        thread = threading.Thread(target=send_packet,
-                                                  args=(router_addr, router_port, packets[i + window_start],))
-                        thread_list.append(thread)
-                    except:
-                        pass
-
-            for t in thread_list:
-                try:
-                    t.start()
-                except:
-                    pass
-            for t in thread_list:
-                t.join()
-        print("DONE!")
-        p.packet_type = 1
-        p.payload = route.encode("utf-8")
-        conn.sendto(p.to_bytes(), (router_addr, router_port))
+                    send_packet(router_addr, router_port, packets[i + window_start], len(packets))
+        # print("DONE!")
+        # p.packet_type = 1
+        # p.payload = route.encode("utf-8")
+        # conn.sendto(p.to_bytes(), (router_addr, router_port))
+        #
+        # conn.settimeout(timeout)
+        # print('Waiting for a ack response')
+        # response, sender = conn.recvfrom(1024)
+        # p = Packet.from_bytes(response)
+        send_final_ack(router_addr, router_port, p, conn, route)
 
     except socket.timeout:
         print('No response after {}s'.format(timeout))
@@ -101,9 +150,27 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, method
         conn.close()
 
 
-def send_packet(router_addr, router_port, packet):
+def send_final_ack(router_addr, router_port, p, conn, route):
+    timeout = 2
+    try:
+        print("DONE!")
+        p.packet_type = 1
+        p.payload = route.encode("utf-8")
+        conn.sendto(p.to_bytes(), (router_addr, router_port))
+
+        conn.settimeout(timeout)
+        print('Waiting for a ack response')
+        response, sender = conn.recvfrom(1024)
+    except socket.timeout:
+        print('No final response after {}s'.format(timeout))
+        send_final_ack(router_addr, router_port, p, conn, route)
+    finally:
+        conn.close()
+
+
+def send_packet(router_addr, router_port, packet, packet_length):
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    timeout = 4
+    timeout = 0.5
 
     try:
         msg = packet.payload.decode("utf-8")
@@ -114,14 +181,17 @@ def send_packet(router_addr, router_port, packet):
         conn.settimeout(timeout)
         print('Waiting for a response')
         response, sender = conn.recvfrom(1024)
+
         p = Packet.from_bytes(response)
-        print('Router: ', sender)
+        # print('Router: ', sender)
         print('Packet: ', p)
-        print('Packet Type', p.packet_type)
+        # print('Packet Type', p.packet_type)
         print('Sequence Number', p.seq_num)
         # print('Payload: ' + p.payload.decode("utf-8"))
 
         global window_start
+        global window_size
+        global buffered_packets
 
         try:
             if p.packet_type == 1:
@@ -196,5 +266,13 @@ args = parser.parse_args()
 
 if args.method == 'post':
     make_POST_packets(args.routerhost, args.routerport, args.serverhost, args.serverport, args.method, args.route)
+
+if args.route != "/files/":
+    args.route = "/files/" + args.route
+
 if args.method == 'get' and '.txt' not in args.route:
     handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+
+if args.method == 'get' and '.txt' in args.route:
+    print('here')
+    handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
