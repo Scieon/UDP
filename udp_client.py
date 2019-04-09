@@ -26,11 +26,12 @@ def handle_get_directory(router_addr, router_port, server_addr, server_port, rou
                peer_port=server_port,
                payload=payload)
     try:
-        print('Requesting all files within directory')
+        print('Requesting all files within directory: ' + args.route)
         conn.sendto(p.to_bytes(), (router_addr, router_port))
         conn.settimeout(timeout)
         response, sender = conn.recvfrom(1024)
 
+        print('\n--------------------------------')
         p = Packet.from_bytes(response)
         print(p.payload.decode("utf-8"))
 
@@ -55,11 +56,10 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
                peer_port=server_port,
                payload=payload)
     try:
-        print('Sending request for file')
-
         buffered_file = {}
-        timeout = 1
+        timeout = 2
 
+        print('Sending request for file: ' + args.route)
         conn.sendto(p.to_bytes(), (router_addr, router_port))
         conn.settimeout(timeout)
 
@@ -70,9 +70,9 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         if p.packet_type == ACK:
             buffered_file[p.seq_num] = p
 
-        while p.packet_type != ACK:  # 1 is ACK
+        while p.packet_type != ACK:
+            print('RECEVIED A PACKET!')
             print(p)
-            # p.seq_num += 1
             conn.sendto(p.to_bytes(), sender)
             conn.settimeout(timeout)
 
@@ -83,6 +83,8 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
             # print(p.payload.decode("utf-8"))
         print('RETRIEVED ALL PACKETS FOR FILE WITHIN CLIENT')
 
+        print(buffered_file)
+        print('\n--------------------------------')
         msg = ''
         for seq_num, packet in sorted(buffered_file.items()):
             msg += packet.payload.decode('utf-8')
@@ -107,13 +109,16 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, arg_bo
     packets = []
 
     try:
-        body = "Hello World"
-        # body = "0Hello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
-        body = arg_body
+        print('Sending request to write to file: ' + args.route)
+
+        # body = "Hello World"
+        body = "0zello WorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWweweweorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWor2ldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWo3rldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorlddWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorld09WorldWorldWorldWorlldWdWorldWorldWrldWrldWorldWorldWorldWorldWorldWodWorldWorldWorldWorldWorldWorldWorldWorlWorldWorldWorldWorldWorldWorldWorldWoWorldWorldWorldWorldWorldWorldWorldWorldWorldWorldWorld4"
+        # body = arg_body
 
         payload = body.encode("utf-8")
         seq_num = 1
 
+        # Creates packets also splits if needed
         while len(payload) > 1012 or len(payload) > 0:
             msg = payload[0:1012]
             payload = payload[1012:]
@@ -132,9 +137,10 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, arg_bo
 
         window_size = math.floor(len(packets) / 2)
         thread_list = []
-
         if window_size == 0:
-            send_packet(router_addr, router_port, packets[0], len(packets))
+            p = send_packet(router_addr, router_port, packets[0], len(packets))
+            while p is None:
+                p = send_packet(router_addr, router_port, packets[0], len(packets))
         else:
             while window_start < len(packets):
                 for i in range(window_size):
@@ -164,7 +170,7 @@ def make_POST_packets(router_addr, router_port, server_addr, server_port, arg_bo
 def send_final_ack(router_addr, router_port, p, conn, route):
     timeout = 2
     try:
-        print("DONE!")
+        print("Sending final packet!")
         p.packet_type = 1
         p.payload = route.encode("utf-8")
         conn.sendto(p.to_bytes(), (router_addr, router_port))
@@ -181,7 +187,7 @@ def send_final_ack(router_addr, router_port, p, conn, route):
 
 def send_packet(router_addr, router_port, packet, packet_length):
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    timeout = 0.5
+    timeout = 2
 
     try:
         msg = packet.payload.decode("utf-8")
@@ -195,7 +201,7 @@ def send_packet(router_addr, router_port, packet, packet_length):
 
         p = Packet.from_bytes(response)
         # print('Router: ', sender)
-        print('Packet: ', p)
+        print('\nPacket: ', p)
         # print('Packet Type', p.packet_type)
         print('Sequence Number', p.seq_num)
         # print('Payload: ' + p.payload.decode("utf-8"))
@@ -219,9 +225,11 @@ def send_packet(router_addr, router_port, packet, packet_length):
         except:
             print('Reached end of buffer')
         print('--------')
+        return p
 
     except socket.timeout:
         print('No response after {}s'.format(timeout))
+        print('\n')
     finally:
         conn.close()
 
@@ -285,5 +293,4 @@ if args.method == 'get' and '.txt' not in args.route:
     handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
 
 if args.method == 'get' and '.txt' in args.route:
-    print('here')
     handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
