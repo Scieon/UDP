@@ -10,6 +10,7 @@ ACK = 1
 window_size = 0
 window_start = 0
 buffered_packets = {}
+buffered_file = {}
 
 
 def handle_get_directory(router_addr, router_port, server_addr, server_port, route):
@@ -42,24 +43,24 @@ def handle_get_directory(router_addr, router_port, server_addr, server_port, rou
         conn.close()
 
 
-def handle_get_file(router_addr, router_port, server_addr, server_port, route):
+def route_get_file(router_addr, router_port, server_addr, server_port, route):
     peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
     conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    timeout = 1
+    timeout = 2
+
+    global buffered_file
 
     msg = 'get,' + route
     payload = msg.encode("utf-8")
 
     p = Packet(packet_type=0,
-               seq_num=1,
+               seq_num=0,
                peer_ip_addr=peer_ip,
                peer_port=server_port,
                payload=payload)
-    try:
-        buffered_file = {}
-        timeout = 2
 
-        print('Sending request for file: ' + args.route)
+    try:
+        print('Routing request for file: ' + args.route)
         conn.sendto(p.to_bytes(), (router_addr, router_port))
         conn.settimeout(timeout)
 
@@ -67,19 +68,126 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         response, sender = conn.recvfrom(1024)
         p = Packet.from_bytes(response)
 
+        # Single Packet
+        if p.packet_type == ACK:
+            buffered_file[p.seq_num] = p
+
+            print('RETRIEVED SINGLE PACKETS FOR FILE WITHIN CLIENT')
+
+            print(buffered_file)
+            print('\n--------------------------------')
+            msg = ''
+            for seq_num, packet in sorted(buffered_file.items()):
+                msg += packet.payload.decode('utf-8')
+            print(msg)
+
+        buffered_file[p.seq_num] = p
+
+        print('GOT THIS FROM SERVER')
+        print(p)
+
+        request_next_packets(router_addr, router_port, server_addr, server_port, route, p)
+
+        print('~~RETRIEVED ALL PACKETS FOR FILE WITHIN CLIENT')
+
+        print(buffered_file)
+        print('\n--------------------------------')
+        msg = ''
+        for seq_num, packet in sorted(buffered_file.items()):
+            msg += packet.payload.decode('utf-8')
+        print(msg)
+
+    except socket.timeout:
+        print('No response after {}s'.format(timeout))
+        route_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+
+
+def get_next_pkt(router_addr, router_port, pkt):
+    conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    timeout = 2
+
+    try:
+        print('Sending packet: ' + str(pkt.seq_num))
+        conn.sendto(pkt.to_bytes(), (router_addr, router_port))
+        conn.settimeout(timeout)
+
+        response, sender = conn.recvfrom(1024)
+        return Packet.from_bytes(response)
+    except socket.timeout:
+        print('timeout')
+
+
+def request_next_packets(router_addr, router_port, server_addr, server_port, route, pkt):
+    peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
+    conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    timeout = 2
+
+    try:
+        while pkt.packet_type != ACK:
+            print('~Sending request for file: ' + args.route)
+            conn.sendto(pkt.to_bytes(), (router_addr, router_port))
+            conn.settimeout(timeout)
+
+            #  RESPONSE FROM SERVER
+            response, sender = conn.recvfrom(1024)
+            p = Packet.from_bytes(response)
+            print('\nGot packet seq#: ' + str(p.seq_num))
+            buffered_packets[p.seq_num] = p
+
+            request_next_packets(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route, p)
+
+    except socket.timeout:
+        print('No response after {}s'.format(timeout))
+        print('Requesting pkt: ' + str(pkt.seq_num))
+        request_next_packets(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route, pkt)
+
+
+def handle_get_file(router_addr, router_port, server_addr, server_port, route):
+    peer_ip = ipaddress.ip_address(socket.gethostbyname(server_addr))
+    conn = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    timeout = 2
+
+    global buffered_file
+
+    msg = 'get,' + route
+    payload = msg.encode("utf-8")
+
+    p = Packet(packet_type=0,
+               seq_num=0,
+               peer_ip_addr=peer_ip,
+               peer_port=server_port,
+               payload=payload)
+    try:
+        print('Sending request for file: ' + args.route)
+        conn.sendto(p.to_bytes(), (router_addr, router_port))
+        conn.settimeout(timeout)
+
+        #  RESPONSE FROM SERVER
+        response, sender = conn.recvfrom(1024)
+        p = Packet.from_bytes(response)
+        print('RECEIVED')
+        print(p)
+
+        # Single Packet
         if p.packet_type == ACK:
             buffered_file[p.seq_num] = p
 
         while p.packet_type != ACK:
-            print('RECEVIED A PACKET!')
-            print(p)
+            buffered_packets[p.seq_num] = p
+
+            print('\nReceived Packet: {}'.format(p))
+            print('\n')
+
             conn.sendto(p.to_bytes(), sender)
             conn.settimeout(timeout)
 
-            buffered_file[p.seq_num] = p
-
             response, sender = conn.recvfrom(1024)
+
+            buffered_file[p.seq_num] = p
+            print('\nReceived pkt: {}'.format(p))
+            print('\n')
             p = Packet.from_bytes(response)
+
             # print(p.payload.decode("utf-8"))
         print('RETRIEVED ALL PACKETS FOR FILE WITHIN CLIENT')
 
@@ -95,10 +203,6 @@ def handle_get_file(router_addr, router_port, server_addr, server_port, route):
         handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
     finally:
         conn.close()
-
-
-def request_packet():
-    pass
 
 
 def make_POST_packets(router_addr, router_port, server_addr, server_port, arg_body, route):
@@ -293,4 +397,5 @@ if args.method == 'get' and '.txt' not in args.route:
     handle_get_directory(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
 
 if args.method == 'get' and '.txt' in args.route:
-    handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+    # handle_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)
+    route_get_file(args.routerhost, args.routerport, args.serverhost, args.serverport, args.route)

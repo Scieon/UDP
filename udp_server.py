@@ -63,7 +63,7 @@ def handle_get_file(conn, packet, sender, filepath):
 
     msg = str(f.read())
     payload = msg.encode("utf-8")
-    print(msg)
+    # print(msg)
     seq_num = 1
     packets = []
 
@@ -82,8 +82,6 @@ def handle_get_file(conn, packet, sender, filepath):
         seq_num += 1
         packets.append(p)
 
-    print(packets)
-
     if window_start is None:
         window_start = 0
     if window_size is None:
@@ -92,20 +90,30 @@ def handle_get_file(conn, packet, sender, filepath):
     thread_list = []
     global buffered_file_packets
 
+    print(packets)
+
     if window_size == 0:
         send_single_final_pkt(conn, packets[0], sender)
+        window_size = None
+        window_start = None
 
     else:
         while window_start < len(packets):
             for i in range(window_size):
                 if i + window_start < len(packets) and packets[i + window_start].seq_num not in buffered_file_packets:
+                    print('============================================')
                     print('Sending packet ' + str(i + window_start + 1))
                     print(packets[i+window_start])
                     p = send_file_packet(conn, packets[i + window_start], sender)
 
                     # Client never sent back an ack
                     if p is None:
-                        print('Never rcved ack')
+                        print('Never rcved ack\n')
+                        print('^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^')
+                        continue
+
+                    if p.seq_num == 0:
+                        print('USELESS ROUTER PACKET')
                         continue
 
                     buffered_file_packets[p.seq_num] = p
@@ -120,6 +128,7 @@ def handle_get_file(conn, packet, sender, filepath):
         print("Finished sending all file packets")
         window_size = None
         window_start = None
+        buffered_file_packets = {}
 
         #  If this gets dropped we are in bad shit
         send_single_final_pkt(conn, packet, sender)
@@ -130,6 +139,7 @@ def send_single_final_pkt(conn, packet, sender):
     packet.packet_type = ACK
     conn.sendto(packet.to_bytes(), sender)
     print('SENT FINAL PACKET OUT...')
+    return packet
 
 
 def send_file_packet(conn, packet, sender):
@@ -141,9 +151,11 @@ def send_file_packet(conn, packet, sender):
         # print('Waiting for a response')
 
         response, sender = conn.recvfrom(1024)
-        print('---------')
-        print('RCVED SOMETHING BACK')
+        p = Packet.from_bytes(response)
         print(Packet.from_bytes(response))
+        print('RCV back PACKET SEQ #: ' + str(p.seq_num))
+        # exit()
+
         return Packet.from_bytes(response)
 
     except socket.timeout:
