@@ -44,10 +44,33 @@ def run_server(port):
                 else:
                     handle_get_file(conn, p, sender, filepath)
             else:
-                handle_client(conn, data, sender)
+
+                if p.packet_type == SYN:
+                    print('SYN Request')
+                    p.packet_type = SYN_ACK
+                    handle_syn(conn, p, sender)
+                # if p.packet_type == ACK:
+                #     print('DONE TCP HANDSHAKE')
+                else:
+                    print('PERFORMING POST')
+                    handle_client(conn, data, sender)
 
     finally:
         conn.close()
+
+
+def handle_syn(conn, packet, sender):
+    try:
+        conn.sendto(packet.to_bytes(), sender)
+    except socket.timeout:
+        print('timeout for syn-ack')
+
+
+def handle_ack(conn, packet, sender):
+    try:
+        conn.sendto(packet.to_bytes(), sender)
+    except socket.timeout:
+        print('timeout for final ack')
 
 
 def handle_get_directories(conn, packet, sender):
@@ -157,7 +180,7 @@ def handle_client(conn, data, sender):
         global buffered_post_packets
 
         print('---------')
-        print('Packet received: ' + p)
+        print('Packet received: {}'.format(p))
         # Last packet has been sent so client has sent ACK
         if p.packet_type == ACK:
             print(buffered_post_packets)
