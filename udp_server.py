@@ -45,6 +45,7 @@ def run_server(port):
                     handle_get_file(conn, p, sender, filepath)
             else:
                 handle_client(conn, data, sender)
+                buffered_post_packets = {}
 
     finally:
         conn.close()
@@ -91,7 +92,7 @@ def handle_get_file(conn, packet, sender, filepath):
 
     thread_list = []
     global buffered_file_packets
-
+    window_size = 0 
     if window_size == 0:
         send_single_final_pkt(conn, packets[0], sender)
 
@@ -168,8 +169,10 @@ def handle_client(conn, data, sender):
             filepath = p.payload.decode("utf-8")
             f = open('./files/' + filepath + '.txt', 'w+')
             f.write(msg)
+            print(msg)
             print('DONE ^^^^')
-            buffered_post_packets = {}
+            # buffered_post_packets = {}
+            # exit()
 
         else:
             p.packet_type = ACK
