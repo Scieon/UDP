@@ -157,7 +157,7 @@ def handle_client(conn, data, sender):
         global buffered_post_packets
 
         print('---------')
-        print('Packet received: ' + p)
+        print('Packet received: {}'.format(p))
         # Last packet has been sent so client has sent ACK
         if p.packet_type == ACK:
             print(buffered_post_packets)
